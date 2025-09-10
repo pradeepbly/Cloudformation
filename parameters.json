@@ -1,0 +1,66 @@
+[
+    {
+        "ParameterKey": "VpcName",
+        "ParameterValue": "${VpcName}"
+    },
+    {
+        "ParameterKey": "VpcCIDR",
+        "ParameterValue": "${VpcCIDR}"
+    },
+    {
+        "ParameterKey": "BucketName",
+        "ParameterValue": "${BucketName}"
+    },
+    {
+        "ParameterKey": "PublicSubnetsCIDR",
+        "ParameterValue": "${PublicSubnetsCIDR}"
+    },
+    {
+        "ParameterKey": "WebSubnetsCIDR",
+        "ParameterValue": "${WebSubnetsCIDR}"
+    },
+    {
+        "ParameterKey": "AppSubnetsCIDR",
+        "ParameterValue": "${AppSubnetsCIDR}"
+    },
+    {
+        "ParameterKey": "DataSubnetsCIDR",
+        "ParameterValue": "${DataSubnetsCIDR}"
+    },
+    {
+        "ParameterKey": "MgmtSubnetsCIDR",
+        "ParameterValue": "${MgmtSubnetsCIDR}"
+    },
+    {
+        "ParameterKey": "Region",
+        "ParameterValue": "${Region}"
+    },
+    {
+        "ParameterKey": "AppName",
+        "ParameterValue": "${AppName}"
+    },
+    {
+        "ParameterKey": "DataClassification",
+        "ParameterValue": "${DataClassification}"
+    },
+    {
+        "ParameterKey": "Backup",
+        "ParameterValue": "${Backup}"
+    },
+    {
+        "ParameterKey": "Product",
+        "ParameterValue": "${Product}"
+    },
+    {
+        "ParameterKey": "InfraOwner",
+        "ParameterValue": "${InfraOwner}"
+    },
+    {
+        "ParameterKey": "BusinessUnit",
+        "ParameterValue": "${BusinessUnit}"
+    },
+    {
+        "ParameterKey": "Environment",
+        "ParameterValue": "${Environment}"
+    }
+]
