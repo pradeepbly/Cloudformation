@@ -1,0 +1,1263 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This is a template to create AWS VPC. The template consists of public and private subnets across 4 availability zones. It deploys an Internet Gateway with a default route on the public subnets. It deploys a pair of NAT Gateways(in 2 of 4 AZs) and default routes for them in the private subnets except the data subnets.",
+    "Mappings": {
+        "RegionMap": {
+            "ap-south-1": {
+                "Abbreviation": "ap"
+            },
+            "us-east-1": {
+                "Abbreviation": "nv"
+            },
+            "us-west-2": {
+                "Abbreviation": "or"
+            }
+        }
+    },
+    "Parameters": {
+        "VpcName": {
+            "Type": "String",
+            "Description": "VPC Must be a valid name like vpc-1, vpc-2 and so on"
+        },
+        "VpcCIDR": {
+            "Type": "String",
+            "Description": "CIDR for VPC. The value can be minimum of /28 and a maximum of /16"
+        },
+        "PublicSubnetsCIDR": {
+            "Type": "CommaDelimitedList",
+            "Description": "Comma separated CIDR list for Public subents"
+        },
+        "WebSubnetsCIDR": {
+            "Type": "CommaDelimitedList",
+            "Description": "Comma separated CIDR list of Web (private) subents"
+        },
+        "AppSubnetsCIDR": {
+            "Type": "CommaDelimitedList",
+            "Description": "Comma separated CIDR for App(private) subents"
+        },
+        "DataSubnetsCIDR": {
+            "Type": "CommaDelimitedList",
+            "Description": "Comma separated CIDR for Data(Private) subents"
+        },
+        "MgmtSubnetsCIDR": {
+            "Type": "CommaDelimitedList",
+            "Description": "Comma separated CIDR for Management(Private) subents"
+        },
+        "Region": {
+            "Type": "String",
+            "Description": "Region in which the VPC has to be created. Also make sure the region when running the cloudformation template"
+        },
+        "BusinessUnit": {
+            "Type": "String",
+            "Description": "Provide the BusinessUnit Under which Initiative VPC Creating"
+        },
+        "Environment": {
+            "Type": "String",
+            "Description": "Provide the Environment like poc, qa, stage, prod"
+        }
+    },
+    "Resources": {
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": { "Ref": "VpcCIDR" },
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "InstanceTenancy": "default",
+                "Tags": [
+                    { "Key": "Name","Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [".",{"Ref": "BusinessUnit"}]}]},{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{"Ref": "VpcName"}]]}}]
+            }
+        },
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    { "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".",{"Ref": "BusinessUnit"} ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{"Ref": "VpcName"}, "igw" ]]}}
+                ]
+            }
+        },
+        "InternetGatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "InternetGatewayId": { "Ref": "InternetGateway" },
+                "VpcId": { "Ref": "VPC"}
+            }
+        },
+        "PublicSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "0", { "Ref": "PublicSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "public", { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "Region" }}]}]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"public(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "PublicSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "1", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "1", { "Ref": "PublicSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "public", { "Fn::Select": [ "1", { "Fn::GetAZs": { "Ref": "Region" }}]}]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"public(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "PublicSubnet3": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "2", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "2", { "Ref": "PublicSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "public", { "Fn::Select": [ "2", { "Fn::GetAZs": { "Ref": "Region" }}]}]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"public(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "PublicSubnet4": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "3", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "3", { "Ref": "PublicSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "public", { "Fn::Select": [ "3", { "Fn::GetAZs": { "Ref": "Region" }}]}]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"public(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "AppSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "Region"}}]},
+                "CidrBlock": { "Fn::Select": [ "0", { "Ref": "AppSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "app", "private", { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"app(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "AppSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "1", { "Fn::GetAZs": { "Ref": "Region"}}]},
+                "CidrBlock": { "Fn::Select": [ "1", { "Ref": "AppSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "app", "private", { "Fn::Select": [ "1", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"app(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "AppSubnet3": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "2", { "Fn::GetAZs": { "Ref": "Region"}}]},
+                "CidrBlock": { "Fn::Select": [ "2", { "Ref": "AppSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "app", "private", { "Fn::Select": [ "2", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"app(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "AppSubnet4": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "3", { "Fn::GetAZs": { "Ref": "Region"}}]},
+                "CidrBlock": { "Fn::Select": [ "3", { "Ref": "AppSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "app", "private", { "Fn::Select": [ "3", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"app(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "WebSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "0", { "Ref": "WebSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "web", "private", { "Fn::Select": [ "0", {"Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"web(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "WebSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "1", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "1", { "Ref": "WebSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "web", "private", { "Fn::Select": [ "1", {"Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"web(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "WebSubnet3": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "2", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "2", { "Ref": "WebSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "web", "private", { "Fn::Select": [ "2", {"Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"web(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "WebSubnet4": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "3", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "3", { "Ref": "WebSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "web", "private", { "Fn::Select": [ "3", {"Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"web(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "DataSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "0", { "Ref": "DataSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "data", "private", { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"data(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "DataSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "1", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "1", { "Ref": "DataSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "data", "private", { "Fn::Select": [ "1", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"data(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "DataSubnet3": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "2", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "2", { "Ref": "DataSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "data", "private", { "Fn::Select": [ "2", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"data(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "DataSubnet4": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "3", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "3", { "Ref": "DataSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "data", "private", { "Fn::Select": [ "3", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"data(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "MgmtSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "0", { "Ref": "MgmtSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "mgmt", "private", { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"management(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "MgmtSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "1", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "1", { "Ref": "MgmtSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "mgmt", "private", { "Fn::Select": [ "1", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"management(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "MgmtSubnet3": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "2", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "2", { "Ref": "MgmtSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "mgmt", "private", { "Fn::Select": [ "2", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"management(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "MgmtSubnet4": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "AvailabilityZone": { "Fn::Select": [ "3", { "Fn::GetAZs": { "Ref": "Region" }}]},
+                "CidrBlock": { "Fn::Select": [ "3", { "Ref": "MgmtSubnetsCIDR" }]},
+                "MapPublicIpOnLaunch": "false",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "mgmt", "private", { "Fn::Select": [ "3", { "Fn::GetAZs": { "Ref": "Region" }}]} ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"management(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "NatGateway1EIP": {
+            "Type": "AWS::EC2::EIP",
+            "DependsOn": "InternetGatewayAttachment",
+            "Properties": {
+                "Domain": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "eip" ]]}}]
+            }
+        },
+        "NatGateway2EIP": {
+            "Type": "AWS::EC2::EIP",
+            "DependsOn": "InternetGatewayAttachment",
+            "Properties": {
+                "Domain": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "eip" ]]}}]
+            }
+        },
+        "NatGateway1": {
+            "Type": "AWS::EC2::NatGateway",
+            "Properties": {
+                "AllocationId": { "Fn::GetAtt": [ "NatGateway1EIP", "AllocationId" ]},
+                "SubnetId": { "Ref": "PublicSubnet1" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "nat", "gw", "1" ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"management(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "NatGateway2": {
+            "Type": "AWS::EC2::NatGateway",
+            "Properties": {
+                "AllocationId": { "Fn::GetAtt": [ "NatGateway2EIP", "AllocationId" ]},
+                "SubnetId": { "Ref": "PublicSubnet3" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "nat", "gw", "2" ]]}},
+                    { "Key": "immutable_metadata", "Value": {"Fn::Join": [ "", [ "{\"purpose\":\"management(", {"Ref": "VpcName"},")\"}"]] }}]
+            }
+        },
+        "PublicRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "public", "rt"]]}}]
+            }
+        },
+        "DefaultPublicRoute": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "InternetGatewayAttachment",
+            "Properties": {
+                "RouteTableId": { "Ref": "PublicRouteTable" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": { "Ref": "InternetGateway" }
+            }
+        },
+        "PublicSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "PublicRouteTable" },
+                "SubnetId": { "Ref": "PublicSubnet1" }
+            }
+        },
+        "PublicSubnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "PublicRouteTable" },
+                "SubnetId": { "Ref": "PublicSubnet2" }
+            }
+        },
+        "PublicSubnet3RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "PublicRouteTable" },
+                "SubnetId": { "Ref": "PublicSubnet3" }
+            }
+        },
+        "PublicSubnet4RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "PublicRouteTable" },
+                "SubnetId": { "Ref": "PublicSubnet4" }
+            }
+        },
+        "AppRouteTable1": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "app", "private", "rt" ]]}}]
+            }
+        },
+        "AppRouteTable2": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "app", "private", "rt" ]]}}]
+            }
+        },
+        "DefaultAppPrivateRoute1": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": { "Ref": "AppRouteTable1" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": { "Ref": "NatGateway1" }
+            }
+        },
+        "DefaultAppPrivateRoute2": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": { "Ref": "AppRouteTable2" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": { "Ref": "NatGateway2" }
+            }
+        },
+        "AppSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "AppRouteTable1" },
+                "SubnetId": { "Ref": "AppSubnet1" }
+            }
+        },
+        "AppSubnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "AppRouteTable1" },
+                "SubnetId": { "Ref": "AppSubnet2" }
+            }
+        },
+        "AppSubnet3RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "AppRouteTable2" },
+                "SubnetId": { "Ref": "AppSubnet3" }
+            }
+        },
+        "AppSubnet4RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "AppRouteTable2" },
+                "SubnetId": { "Ref": "AppSubnet4" }
+            }
+        },
+        "WebRouteTable1": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "web", "private", "rt" ]]}}]
+            }
+        },
+        "WebRouteTable2": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "web", "private", "rt" ]]}}]
+            }
+        },
+        "DefaultWebPrivateRoute1": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": { "Ref": "WebRouteTable1" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": { "Ref": "NatGateway1" }
+            }
+        },
+        "DefaultWebPrivateRoute2": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": { "Ref": "WebRouteTable2" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": { "Ref": "NatGateway2" }
+            }
+        },
+        "WebSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "WebRouteTable1" },
+                "SubnetId": { "Ref": "WebSubnet1" }
+            }
+        },
+        "WebSubnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "WebRouteTable1" },
+                "SubnetId": { "Ref": "WebSubnet2" }
+            }
+        },
+        "WebSubnet3RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "WebRouteTable2" },
+                "SubnetId": { "Ref": "WebSubnet3" }
+            }
+        },
+        "WebSubnet4RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "WebRouteTable2" },
+                "SubnetId": { "Ref": "WebSubnet4" }
+            }
+        },
+        "DataRouteTable1": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "data", "private", "rt" ]]}}]
+            }
+        },
+        "DataRouteTable2": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "data", "private", "rt" ]]}}]
+            }
+        },
+        "DefaultDataPrivateRoute1": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": { "Ref": "DataRouteTable1" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": { "Ref": "NatGateway1" }
+            }
+        },
+        "DefaultDataPrivateRoute2": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": { "Ref": "DataRouteTable2" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": { "Ref": "NatGateway2" }
+            }
+        },
+        "DataSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "DataRouteTable1" },
+                "SubnetId": { "Ref": "DataSubnet1" }
+            }
+        },
+        "DataSubnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "DataRouteTable1" },
+                "SubnetId": { "Ref": "DataSubnet2" }
+            }
+        },
+        "DataSubnet3RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "DataRouteTable2" },
+                "SubnetId": { "Ref": "DataSubnet3" }
+            }
+        },
+        "DataSubnet4RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "DataRouteTable2" },
+                "SubnetId": { "Ref": "DataSubnet4" }
+            }
+        },
+        "MgmtRouteTable1": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "mgmt", "private", "rt" ]]}}]
+            }
+        },
+        "MgmtRouteTable2": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "mgmt", "private", "rt" ]]}}]
+            }
+        },
+        "DefaultMgmtPrivateRoute1": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": { "Ref": "MgmtRouteTable1" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": { "Ref": "NatGateway1" }
+            }
+        },
+        "DefaultMgmtPrivateRoute2": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": { "Ref": "MgmtRouteTable2" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": { "Ref": "NatGateway2" }
+            }
+        },
+        "MgmtSubnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "MgmtRouteTable1" },
+                "SubnetId": { "Ref": "MgmtSubnet1" }
+            }
+        },
+        "MgmtSubnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "MgmtRouteTable1" },
+                "SubnetId": { "Ref": "MgmtSubnet2" }
+            }
+        },
+        "MgmtSubnet3RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "MgmtRouteTable2" },
+                "SubnetId": { "Ref": "MgmtSubnet3" }
+            }
+        },
+        "MgmtSubnet4RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": { "Ref": "MgmtRouteTable2" },
+                "SubnetId": { "Ref": "MgmtSubnet4" }
+            }
+        },
+        "PublicSubnetNacl": {
+            "Type": "AWS::EC2::NetworkAcl",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "public", "nacl" ]]}}]
+            }
+        },
+        "PublicSubnetEgressNetworkAclEntry": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "PublicSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "RuleAction": "allow",
+                "Egress": "true",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "PublicSubnetIngressNetworkAclEntry": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "PublicSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "PublicSubnet1NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "PublicSubnet1" },
+                "NetworkAclId": { "Ref": "PublicSubnetNacl" }
+            }
+        },
+        "PublicSubnet2NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "PublicSubnet2" },
+                "NetworkAclId": { "Ref": "PublicSubnetNacl" }
+            }
+        },
+        "PublicSubnet3NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "PublicSubnet3" },
+                "NetworkAclId": { "Ref": "PublicSubnetNacl" }
+            }
+        },
+        "PublicSubnet4NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "PublicSubnet4" },
+                "NetworkAclId": { "Ref": "PublicSubnetNacl" }
+            }
+        },
+        "AppSubnetNacl": {
+            "Type": "AWS::EC2::NetworkAcl",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "app", "private", "nacl" ]]}}]
+            }
+        },
+        "AppSubnetEgressNetworkAclEntry1": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "AppSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "RuleAction": "allow",
+                "Egress": "true",
+                "CidrBlock": { "Ref": "VpcCIDR" }
+            }
+        },
+        "AppSubnetEgressNetworkAclEntry2": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "AppSubnetNacl" },
+                "RuleNumber": "200",
+                "Protocol": "6",
+                "PortRange": {"From": "32768", "To": "65535"},
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "AppSubnetEgressNetworkAclEntry3": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "AppSubnetNacl" },
+                "RuleNumber": "300",
+                "Protocol": "6",
+                "PortRange": { "From": "80", "To": "80" },
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "AppSubnetEgressNetworkAclEntry4": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "AppSubnetNacl" },
+                "RuleNumber": "400",
+                "Protocol": "6",
+                "PortRange": { "From": "443", "To": "443" },
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "AppSubnetIngressNetworkAclEntry1": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "AppSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "RuleAction": "allow",
+                "CidrBlock": { "Ref": "VpcCIDR" }
+            }
+        },
+        "AppSubnetIngressNetworkAclEntry2": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "AppSubnetNacl" },
+                "RuleNumber": "200",
+                "Protocol": "6",
+                "PortRange": {"From": "32768", "To": "65535"},
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "AppSubnet1NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "AppSubnet1" },
+                "NetworkAclId": { "Ref": "AppSubnetNacl" }
+            }
+        },
+        "AppSubnet2NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "AppSubnet2" },
+                "NetworkAclId": { "Ref": "AppSubnetNacl" }
+            }
+        },
+        "AppSubnet3NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "AppSubnet3" },
+                "NetworkAclId": { "Ref": "AppSubnetNacl" }
+            }
+        },
+        "AppSubnet4NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "AppSubnet4" },
+                "NetworkAclId": { "Ref": "AppSubnetNacl" }
+            }
+        },
+        "WebSubnetNacl": {
+            "Type": "AWS::EC2::NetworkAcl",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "web", "private", "nacl" ]]}}]
+            }
+        },
+        "WebSubnetIngressNetworkAclEntry1": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "WebSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "RuleAction": "allow",
+                "CidrBlock": { "Ref": "VpcCIDR" }
+            }
+        },
+        "WebSubnetInressNetworkAclEntry2": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "WebSubnetNacl" },
+                "RuleNumber": "200",
+                "Protocol": "6",
+                "PortRange": {"From": "32768", "To": "65535"},
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "WebSubnetEgressNetworkAclEntry1": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "WebSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": { "Ref": "VpcCIDR" }
+            }
+        },
+        "WebSubnetEgressNetworkAclEntry2": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "WebSubnetNacl" },
+                "RuleNumber": "200",
+                "Protocol": "6",
+                "PortRange": {"From": "32768", "To": "65535"},
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "WebSubnetEgressNetworkAclEntry3": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "WebSubnetNacl" },
+                "RuleNumber": "300",
+                "Protocol": "6",
+                "PortRange": { "From": "80", "To": "80" },
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "WebSubnetEgressNetworkAclEntry4": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "WebSubnetNacl" },
+                "RuleNumber": "400",
+                "Protocol": "6",
+                "PortRange": { "From": "443", "To": "443" },
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "WebSubnet1NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "WebSubnet1"
+                },
+                "NetworkAclId": { "Ref": "WebSubnetNacl" }
+            }
+        },
+        "WebSubnet2NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "WebSubnet2" },
+                "NetworkAclId": { "Ref": "WebSubnetNacl" }
+            }
+        },
+        "WebSubnet3NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "WebSubnet3" },
+                "NetworkAclId": { "Ref": "WebSubnetNacl" }
+            }
+        },
+        "WebSubnet4NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "WebSubnet4" },
+                "NetworkAclId": { "Ref": "WebSubnetNacl" }
+            }
+        },
+        "DataSubnetNacl": {
+            "Type": "AWS::EC2::NetworkAcl",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "data", "private", "nacl" ]]}}]
+            }
+        },
+        "DataSubnetIngressNetworkAclEntry1": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "RuleAction": "allow",
+                "CidrBlock": { "Ref": "VpcCIDR" }
+            }
+        },
+        "DataSubnetIngressNetworkAclEntry2": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "600",
+                "Protocol": "6",
+                "PortRange": {"From": "32768", "To": "65535"},
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "DataSubnetIngressNetworkAclEntry3": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "200",
+                "Protocol": "-1",
+                "RuleAction": "deny",
+                "CidrBlock": { "Fn::Select": [ "0", { "Ref": "PublicSubnetsCIDR" }]}
+            }
+        },
+        "DataSubnetIngressNetworkAclEntry4": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "300",
+                "Protocol": "-1",
+                "RuleAction": "deny",
+                "CidrBlock": { "Fn::Select": [ "1", { "Ref": "PublicSubnetsCIDR" }]}
+            }
+        },
+        "DataSubnetIngressNetworkAclEntry5": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "400",
+                "Protocol": "-1",
+                "RuleAction": "deny",
+                "CidrBlock": { "Fn::Select": [ "2", { "Ref": "PublicSubnetsCIDR" }]}
+            }
+        },
+        "DataSubnetIngressNetworkAclEntry6": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "500",
+                "Protocol": "-1",
+                "RuleAction": "deny",
+                "CidrBlock": { "Fn::Select": [ "3", { "Ref": "PublicSubnetsCIDR" }]}
+            }
+        },
+        "DataSubnetEgressNetworkAclEntry1": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": { "Ref": "VpcCIDR" }
+            }
+        },
+        "DataSubnetEgressNetworkAclEntry2": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "200",
+                "Protocol": "6",
+                "PortRange": { "From": "32768", "To": "65535" },
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "DataSubnetEgressNetworkAclEntry3": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "300",
+                "Protocol": "6",
+                "PortRange": { "From": "80", "To": "80" },
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "DataSubnetEgressNetworkAclEntry4": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "DataSubnetNacl" },
+                "RuleNumber": "400",
+                "Protocol": "6",
+                "PortRange": { "From": "443", "To": "443" },
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "DataSubnet1NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "DataSubnet1" },
+                "NetworkAclId": { "Ref": "DataSubnetNacl" }
+            }
+        },
+        "DataSubnet2NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "DataSubnet2" },
+                "NetworkAclId": { "Ref": "DataSubnetNacl" }
+            }
+        },
+        "DataSubnet3NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "DataSubnet3" },
+                "NetworkAclId": { "Ref": "DataSubnetNacl" }
+            }
+        },
+        "DataSubnet4NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "DataSubnet4" },
+                "NetworkAclId": { "Ref": "DataSubnetNacl" }
+            }
+        },
+        "MgmtSubnetNacl": {
+            "Type": "AWS::EC2::NetworkAcl",
+            "Properties": {
+                "VpcId": { "Ref": "VPC" },
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"}, "mgmt", "private", "nacl" ]]}}]
+            }
+        },
+        "MgmtSubnetIngressNetworkAclEntry1": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "RuleAction": "allow",
+                "CidrBlock": { "Ref": "VpcCIDR" }
+            }
+        },
+        "MgmtSubnetIngressNetworkAclEntry2": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl" },
+                "RuleNumber": "200",
+                "Protocol": "6",
+                "PortRange": { "From": "32768", "To": "65535" },
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "MgmtSubnetEgressNetworkAclEntry1": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl" },
+                "RuleNumber": "100",
+                "Protocol": "-1",
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": { "Ref": "VpcCIDR" }
+            }
+        },
+        "MgmtSubnetEgressNetworkAclEntry2": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl" },
+                "RuleNumber": "200",
+                "Protocol": "6",
+                "PortRange": {"From": "32768", "To": "65535"} ,
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "MgmtSubnetEgressNetworkAclEntry3": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl" },
+                "RuleNumber": "300",
+                "Protocol": "6",
+                "PortRange": { "From": "80", "To": "80" },
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "MgmtSubnetEgressNetworkAclEntry4": {
+            "Type": "AWS::EC2::NetworkAclEntry",
+            "Properties": {
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl" },
+                "RuleNumber": "400",
+                "Protocol": "6",
+                "PortRange": { "From": "443", "To": "443" },
+                "Egress": "true",
+                "RuleAction": "allow",
+                "CidrBlock": "0.0.0.0/0"
+            }
+        },
+        "MgmtSubnet1NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "MgmtSubnet1" },
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl" }
+            }
+        },
+        "MgmtSubnet2NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "MgmtSubnet2" },
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl" }
+            }
+        },
+        "MgmtSubnet3NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "MgmtSubnet3" },
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl"
+                }
+            }
+        },
+        "MgmtSubnet4NetworkAclAssociation": {
+            "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "MgmtSubnet4" },
+                "NetworkAclId": { "Ref": "MgmtSubnetNacl" }
+            }
+        },
+        "FlowLogRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+               "AssumeRolePolicyDocument": {
+                  "Version" : "2012-10-17",
+                  "Statement": [ {
+                     "Effect": "Allow",
+                     "Principal": {
+                        "Service": [ "vpc-flow-logs.amazonaws.com" ]
+                     },
+                     "Action": [ "sts:AssumeRole" ]
+                  } ]
+               },
+               "Path": "/",
+               "RoleName": "vpc-flow-logs-role-prod",
+               "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"} ]]}}]
+            }
+        },
+        "FlowLogPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+               "PolicyName": "vpc-flow-log-policy",
+               "PolicyDocument": {
+                "Statement": [
+                    {
+                        "Action": [
+                            "logs:CreateLogGroup",
+                            "logs:CreateLogStream",
+                            "logs:DescribeLogGroups",
+                            "logs:DescribeLogStreams",
+                            "logs:PutLogEvents"
+                        ],
+                        "Effect": "Allow",
+                        "Resource": "*"
+                    }
+                ]},
+                "Roles": [{ "Ref": "FlowLogRole" }]
+            }
+         },
+        "VPCFlowLogs": {
+            "Type" : "AWS::EC2::FlowLog",
+            "Properties" : {
+                "DeliverLogsPermissionArn" : { "Fn::GetAtt" : ["FlowLogRole", "Arn"] },
+                "LogGroupName" : "FlowLogsGroup",
+                "ResourceId" : { "Ref" : "VPC" },
+                "ResourceType" : "VPC",
+                "TrafficType" : "ALL",
+                "Tags": [{ "Key": "Name", "Value": {"Fn::Join": ["-",[{"Fn::Join": ["-",{"Fn::Split": [ ".", { "Ref": "BusinessUnit" } ]}] },{"Ref": "Environment"},{"Fn::FindInMap": ["RegionMap",{"Ref": "Region"},"Abbreviation"]},{ "Ref": "VpcName"} ]]}}]
+            }
+        }
+    },
+    "Outputs": {
+        "VPC": {
+            "Description": "Reference to the VPC created",
+            "Value": { "Ref": "VPC" }
+        },
+        "PublicSubnet1": {
+            "Description": "Reference to the Public Subnet 1 created",
+            "Value": { "Ref": "PublicSubnet1" }
+        },
+        "PublicSubnet2": {
+            "Description": "Reference to the Public Subnet 2 created",
+            "Value": { "Ref": "PublicSubnet2" }
+        },
+        "PublicSubnet3": {
+            "Description": "Reference to the Public Subnet 3 created",
+            "Value": { "Ref": "PublicSubnet3" }
+        },
+        "PublicSubnet4": {
+            "Description": "Reference to the Public Subnet 4 created",
+            "Value": { "Ref": "PublicSubnet4" }
+        },
+        "AppSubnet1": {
+            "Description": "Reference to the App Subnet 1 created",
+            "Value": { "Ref": "AppSubnet1" }
+        },
+        "AppSubnet2": {
+            "Description": "Reference to the App Subnet 2 created",
+            "Value": { "Ref": "AppSubnet2" }
+        },
+        "AppSubnet3": {
+            "Description": "Reference to the App Subnet 3 created",
+            "Value": { "Ref": "AppSubnet3" }
+        },
+        "AppSubnet4": {
+            "Description": "Reference to the App Subnet 4 created",
+            "Value": { "Ref": "AppSubnet4" }
+        },
+        "WebSubnet1": {
+            "Description": "Reference to the Web Subnet 1 created",
+            "Value": { "Ref": "WebSubnet1" }
+        },
+        "WebSubnet2": {
+            "Description": "Reference to the Web Subnet 2 created",
+            "Value": { "Ref": "WebSubnet2" }
+        },
+        "WebSubnet3": {
+            "Description": "Reference to the Web Subnet 3 created",
+            "Value": { "Ref": "WebSubnet3" }
+        },
+        "WebSubnet4": {
+            "Description": "Reference to the Web Subnet 4 created",
+            "Value": { "Ref": "WebSubnet4" }
+        },
+        "DataSubnet1": {
+            "Description": "Reference to the Data Subnet 1 created",
+            "Value": { "Ref": "DataSubnet1" }
+        },
+        "DataSubnet2": {
+            "Description": "Reference to the Data Subnet 2 created",
+            "Value": { "Ref": "DataSubnet2" }
+        },
+        "DataSubnet3": {
+            "Description": "Reference to the Data Subnet 3 created",
+            "Value": { "Ref": "DataSubnet3" }
+        },
+        "DataSubnet4": {
+            "Description": "Reference to the Data Subnet 4 created",
+            "Value": { "Ref": "DataSubnet4" }
+        },
+        "MgmtSubnet1": {
+            "Description": "Reference to the Management Subnet 1 created",
+            "Value": { "Ref": "MgmtSubnet1" }
+        },
+        "MgmtSubnet2": {
+            "Description": "Reference to the Management Subnet 2 created",
+            "Value": { "Ref": "MgmtSubnet2" }
+        },
+        "MgmtSubnet3": {
+            "Description": "Reference to the Management Subnet 3 created",
+            "Value": { "Ref": "MgmtSubnet3" }
+        },
+        "MgmtSubnet4": {
+            "Description": "Reference to the Management Subnet 4 created",
+            "Value": { "Ref": "MgmtSubnet4" }
+        }
+    }
+}
