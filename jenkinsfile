@@ -1,0 +1,156 @@
+pipeline {
+
+  agent { label "eks-build-agent" }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '20'))
+    skipStagesAfterUnstable()
+  }
+
+  parameters {
+    string (
+      name: 'AWSAccountNumber',
+      defaultValue: '',
+      description: 'Input AWS Account Number in which we want to create the Hosted Zone'
+    )
+    string (
+      name: 'StackName',
+      description: 'Provide the Name of the Stack'
+    )
+    string (
+      name: 'BucketName',
+      description: 'Provide the Bucket Name to Upload CFN template'
+    )
+    string (
+      name: 'VpcName',
+      defaultValue: 'vpc-automation',
+      description: 'Provide the Name of the VPC you wish'
+    )
+    string (
+      name: 'VpcCIDR',
+      defaultValue: '192.168.0.0/20',
+      description: 'Provide the CIDR range for the VPC'
+    )
+    string (
+      name: 'PublicSubnetsCIDR',
+      defaultValue: '192.168.0.0/24,192.168.1.0/24,192.168.2.0/24,192.168.3.0/24',
+      description: 'Input AWS Account Number in which we want to create the Hosted Zone'
+    )
+    string (
+      name: 'WebSubnetsCIDR',
+      defaultValue: '192.168.8.0/24,192.168.9.0/24,192.168.10.0/24,192.168.11.0/24',
+      description: 'Input AWS Account Number in which we want to create the Hosted Zone'
+    )
+    string (
+      name: 'AppSubnetsCIDR',
+      defaultValue: '192.168.4.0/24,192.168.5.0/24,192.168.6.0/24,192.168.7.0/24',
+      description: 'Input AWS Account Number in which we want to create the Hosted Zone'
+    )
+    string (
+      name: 'DataSubnetsCIDR',
+      defaultValue: '192.168.14.0/25,192.168.14.128/25,192.168.15.0/25,192.168.15.128/25',
+      description: 'Input AWS Account Number in which we want to create the Hosted Zone'
+    )
+    string (
+      name: 'MgmtSubnetsCIDR',
+      defaultValue: '192.168.12.0/25,192.168.12.128/25,192.168.13.0/25,192.168.13.128/25',
+      description: 'Input AWS Account Number in which we want to create the Hosted Zone'
+    )
+    string (
+      name: 'Region',
+      defaultValue: 'us-east-1',
+      description: 'Provide the Region'
+    )
+    string (
+      name: 'AppName',
+      description: 'Provide the AppName'
+    )
+    string (
+      name: 'DataClassification',
+      defaultValue: 'internal'
+    )
+    string (
+      name: 'Backup',
+      defaultValue: 'no',
+      description: 'Provide whether Backup Needed or not'
+    )
+    string (
+      name: 'Product',
+      description: 'Provide the Plaftrom'
+    )
+    string (
+      name: 'InfraOwner',
+      description: 'Provide the InfraOwner for your Team'
+    )
+    choice (
+      name: 'BusinessUnit',
+      choices: ["travel.app", "travel.pci", "travel.client", "travel.poc", "travel.toolchain", "travel.data", "Infra.Network", "corporatetravel.app", "premiumtravel.app", "Network.Atlas"],
+      description: 'Select BusinessUnit under which you want to create VPC'
+    )
+    choice (
+      name: 'Environment',
+      choices: ["poc", "qa", "stage", "nonprod", "prod"],
+      description: 'Select Environment in which you are creating VPC'
+    )
+
+    choice (
+      name: 'ACTION',
+      choices: ["Create-VPC", "Delete-VPC"],
+      description: 'Select Action you want to perform for Import or Subdomain Registration'
+    )
+  }
+  stages {
+    stage('Create VPC') {
+      when {
+        expression { params.ACTION == 'Create-VPC'}
+      }
+      steps {
+        script{
+            def credentials = getCredentials("${AWSAccountNumber}")
+            withEnv(['AWS_ACCESS_KEY_ID=' + credentials['AWS_ACCESS_KEY_ID'],'AWS_SECRET_ACCESS_KEY=' + credentials['AWS_SECRET_ACCESS_KEY'],'AWS_SESSION_TOKEN=' + credentials['AWS_SESSION_TOKEN']]) {
+            sh '''#!/bin/bash -xe
+            cd "$WORKSPACE""/VPC-Automation/"
+            TEMPLATE_PATH=CFTs/VPC.json
+            PARAMETERS_PATH=parameters/parameters.json
+            envsubst < ${PARAMETERS_PATH} > parameters.json
+            cat parameters.json
+            parameterOverridesJson=\$(jq -r \'.[] | [.ParameterKey, .ParameterValue] | "\\(.[0])=\\(.[1])"' parameters.json)
+            aws cloudformation deploy --stack-name $StackName --region $Region  --template-file $TEMPLATE_PATH --s3-bucket $BucketName --s3-prefix template --parameter-overrides \${parameterOverridesJson} --capabilities CAPABILITY_NAMED_IAM --tags Name=$StackName CreatedBy=Jenkins DataClassification=$DataClassification AppName=$AppName Backup=$Backup Product=$Product BusinessUnit=$BusinessUnit InfraOwner=$InfraOwner Environment=$Environment
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Delete VPC') {
+      when {
+        expression { params.ACTION == 'Delete-VPC'}
+      }
+      steps {
+        script{
+            def credentials = getCredentials("${AWSAccountNumber}")
+            withEnv(['AWS_ACCESS_KEY_ID=' + credentials['AWS_ACCESS_KEY_ID'],'AWS_SECRET_ACCESS_KEY=' + credentials['AWS_SECRET_ACCESS_KEY'],'AWS_SESSION_TOKEN=' + credentials['AWS_SESSION_TOKEN']]) {
+            sh '''#!/bin/bash -xe
+            CURRENT_DIRECTORY=`pwd`
+            cd "$WORKSPACE""/VPC-Automation/"
+            pwd
+            STACKID=`aws cloudformation describe-stacks --stack-name $StackName --query 'Stacks[].StackId' --output text`
+            aws cloudformation delete-stack --stack-name $StackName --region $Region
+            aws cloudformation wait stack-delete-complete --stack-name $STACKID
+            '''
+          }
+        }
+      }
+    }
+  }
+}
+
+def getCredentials(AWSAccountNumber) {
+    def credentials = [:]
+    def awscli = sh(script: "aws sts assume-role --role-arn arn:aws:iam::${AWSAccountNumber}:role/travel-vpce-deployment-role --role-session-name TemporarySessionKeys --output json", returnStdout: true).trim()
+    def json = new groovy.json.JsonSlurper().parseText(awscli)
+    credentials['AWS_ACCESS_KEY_ID'] = json.Credentials.AccessKeyId
+    credentials['AWS_SECRET_ACCESS_KEY'] = json.Credentials.SecretAccessKey
+    credentials['AWS_SESSION_TOKEN'] = json.Credentials.SessionToken
+    return credentials
+}
